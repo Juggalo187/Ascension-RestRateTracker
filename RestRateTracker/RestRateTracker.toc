@@ -1,0 +1,12 @@
+## Interface: 30300
+## Title: Rest Rate Tracker
+## Notes: Tracks rest XP accumulation rate while offline
+## Author: Juggalo187
+## Version: 1.0
+## SavedVariables: RestRateTrackerDB
+
+RRT_Config.lua
+RRT_Utilities.lua
+RRT_Data.lua
+RRT_UI.lua
+RestRateTracker.lua
