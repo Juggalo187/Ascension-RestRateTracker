@@ -145,6 +145,35 @@ function RRT_Data.GetCurrentRestData()
     end
     local isMaxLevel = UnitLevel("player") == serverMaxLevel
     
+     -- Check for Well Rested buff
+    local hasWellRested = false
+    local wellRestedRemaining = 0
+    
+    -- In Classic, use buff name, not spell ID
+    local buffName = "Well Rested"
+    local name, rank, icon, count, debuffType, duration, expires = UnitBuff("player", buffName)
+    
+    if name then
+        hasWellRested = true
+        -- Calculate remaining time at save moment
+        if expires and expires > 0 then
+            local currentTime = GetTime()
+            wellRestedRemaining = expires - currentTime
+            if wellRestedRemaining < 0 then
+                wellRestedRemaining = 0
+            end
+        elseif duration and duration > 0 then
+            -- Fallback: use total duration if no expiration
+            wellRestedRemaining = duration
+        end
+        
+        -- Debug
+        if RRT_Utilities and RRT_Utilities.DebugPrint then
+            RRT_Utilities.DebugPrint("Well Rested buff found: duration=" .. tostring(duration) .. 
+                ", expires=" .. tostring(expires) .. ", remaining=" .. tostring(wellRestedRemaining))
+        end
+    end
+    
     return {
         timestamp = time(),
         level = UnitLevel("player"),
@@ -161,7 +190,10 @@ function RRT_Data.GetCurrentRestData()
         isResting = isInInn,
         class = class or "UNKNOWN",
         isMaxLevel = isMaxLevel,
-        serverMaxLevel = serverMaxLevel
+        serverMaxLevel = serverMaxLevel,
+        hasWellRested = hasWellRested and 1 or 0,
+        wellRestedRemaining = wellRestedRemaining,
+        wellRestedExpires = wellRestedExpires,
     }
 end
 
@@ -306,7 +338,7 @@ function RRT_Data.ShowRestReport(rateData)
         DEFAULT_CHAT_FRAME:AddMessage("|cFFAAAAAAPercent/Hour:|r " .. string.format("%.2f%%", rateData.percentPerHour) .. " of level")
         
         -- Show actual measured rate more prominently
-        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00✓ Measured Rate:|r " .. string.format("%.2f%%/hour", rateData.percentPerHour) .. " (actual)")
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00Measured Rate:|r " .. string.format("%.2f%%/hour", rateData.percentPerHour) .. " (actual)")
         
         if rateData.wasInInn then
             DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[I]|r Logged out in inn/rest area")
@@ -348,7 +380,7 @@ function RRT_Data.ShowRestReport(rateData)
                 DEFAULT_CHAT_FRAME:AddMessage("|cFFAAAAAATime to full rest:|r " .. fullTimeText .. 
                     " (at " .. string.format("%.2f%%/hour", effectiveRate) .. ")")
             else
-                DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00✓|r You have full rested XP!") 
+                DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00|r You have full rested XP!") 
             end
         end
     else
@@ -442,7 +474,7 @@ function RRT_Data.SaveCurrentCharacterData(silent)
         db.logoutData[charKey] = data
         
         if not silent then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[RRT]|r ✓ Saved data for: " .. charKey .. 
+            DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[RRT]|r Saved data for: " .. charKey .. 
                        " (Level: " .. data.level .. 
                        ", XP: " .. data.currentXP .. "/" .. data.maxXP .. 
                        ", Rest: " .. data.restedXP .. ")")
@@ -541,7 +573,61 @@ function RRT_Data.HandleCommand(msg)
         DEFAULT_CHAT_FRAME:AddMessage("|cFFAAAAAA/rrt debug|r - Toggle debug mode")
         DEFAULT_CHAT_FRAME:AddMessage("|cFFAAAAAA/rrt frame|r - Show character data frame")
         DEFAULT_CHAT_FRAME:AddMessage("|cFFAAAAAA(More commands coming soon)|r")
-        
+     elseif command == "wellrested" or command == "wr" then
+		if arg == "list" then
+			local buffs = RRT_Config.GetWellRestedBuffs()
+			DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[RRT]|r Well Rested buffs configured:")
+			for i, spellId in ipairs(buffs) do
+				local spellName = GetSpellInfo(spellId) or "Unknown"
+				DEFAULT_CHAT_FRAME:AddMessage("  " .. i .. ". |cFF00FF00" .. spellId .. "|r - " .. spellName)
+			end
+		elseif arg and strfind(arg, "add") then
+			local spellId = tonumber(strmatch(arg, "add%s+(%d+)"))
+			if spellId then
+				local success = RRT_Config.AddWellRestedBuff(spellId)
+				if success then
+					local spellName = GetSpellInfo(spellId) or "Unknown"
+					DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[RRT]|r Added Well Rested buff: |cFF00FF00" .. spellId .. "|r - " .. spellName)
+				else
+					DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[RRT]|r Failed to add buff or already exists")
+				end
+			else
+				DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[RRT]|r Usage: /rrt wellrested add <spellId>")
+			end
+		elseif arg and strfind(arg, "remove") then
+			local spellId = tonumber(strmatch(arg, "remove%s+(%d+)"))
+			if spellId then
+				local success = RRT_Config.RemoveWellRestedBuff(spellId)
+				if success then
+					DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[RRT]|r Removed Well Rested buff: |cFF00FF00" .. spellId)
+				else
+					DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[RRT]|r Buff not found in configuration")
+				end
+			else
+				DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[RRT]|r Usage: /rrt wellrested remove <spellId>")
+			end
+		elseif arg == "check" or arg == "" then
+			local data = RRT_Data.GetCurrentRestData()
+			if data then
+				if data.hasWellRested == 1 then
+					local remainingTime = data.wellRestedExpires - time()
+					if remainingTime > 0 then
+						local timeText = RRT_Utilities.FormatTime(remainingTime)
+						DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[RRT]|r Well Rested buff active! Time remaining: " .. timeText)
+					else
+						DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[RRT]|r Well Rested buff active!")
+					end
+				else
+					DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[RRT]|r Well Rested buff not active")
+				end
+			end
+		else
+			DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[RRT]|r Well Rested commands:")
+			DEFAULT_CHAT_FRAME:AddMessage("|cFFAAAAAA/rrt wellrested check|r - Check current buff status")
+			DEFAULT_CHAT_FRAME:AddMessage("|cFFAAAAAA/rrt wellrested list|r - List configured buffs")
+			DEFAULT_CHAT_FRAME:AddMessage("|cFFAAAAAA/rrt wellrested add <id>|r - Add buff by spell ID")
+			DEFAULT_CHAT_FRAME:AddMessage("|cFFAAAAAA/rrt wellrested remove <id>|r - Remove buff by spell ID")
+		end
     else
         DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[RRT]|r Unknown command. Type |cFF00FF00/rrt help|r for commands.")
     end

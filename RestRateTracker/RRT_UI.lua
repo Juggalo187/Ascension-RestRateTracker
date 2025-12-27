@@ -172,10 +172,10 @@ function RRT_UI.ShowAllCharacterData()
     
     local headerText
     if db.settings.frameCompactMode then
-        headerText = "|cFFFFAA00Character|r | |cFF00FFFFLvl|r | |cFFFFFF00R%|r | |cFF00AAFFLoc|r | |cFFFFFF00Time|r | |cFF00FF00Rate|r | |cFF00FFFFTo Full|r | |cFFFFFF00S|r"
-    else
-        headerText = "|cFFFFAA00Character|r | |cFF00FFFFLvl|r | |cFFFFFF00RXP|r | |cFF00FF00%|r | |cFF00AAFFLocation|r | |cFFFFFF00Time|r | |cFF00FF00Rate|r | |cFF00FFFFTo Full|r | |cFFFFFF00Status|r"
-    end
+		headerText = "|cFFFFAA00Character|r | |cFF00FFFFLvl|r | |cFFFFFF00R%|r | |cFF00AAFFLoc|r | |cFF00FF00Rate|r | To Full | |cFFFFFF00S|r | |cFF00FFFFWR|r"
+	else
+		headerText = "|cFFFFAA00Character|r | |cFF00FFFFLvl|r | |cFFFFFF00RXP|r | |cFF00FF00%|r | |cFF00AAFFLocation|r | |cFFFFFF00Time|r | |cFF00FF00Rate|r | To Full | |cFFFFFF00Status|r | |cFF00FFFFWR|r"
+	end
     
     local headers = headerButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     headers:SetAllPoints()
@@ -382,19 +382,19 @@ function RRT_UI.ShowAllCharacterData()
         if isMaxLevel then
             -- Max level characters: show only name and level with MAX indicator
             local levelText = string.format("|cFF00FFFF%2d|r", data.level or 0)
-            
+            local locationText = string.format("|cFF00AAFF%-1s|r", (data.location or "Unknown"):sub(1, 30))
             if db.settings.frameCompactMode then
-                line = string.format("%-18s | %s | |cFFAAAAAAMAX|r", charName, levelText)
+                line = string.format("%-18s | %s | |cFFAAAAAAMAX|r | %s |", charName, levelText, locationText)
             else
-                line = string.format("%-18s | %s | |cFFAAAAAAMAX LEVEL|r", charName, levelText)
+                line = string.format("%-18s | %s | |cFFAAAAAAMAX|r | %s |", charName, levelText, locationText)
             end
         else
             -- Non-max level characters: show full information
             if db.settings.frameCompactMode then
                 -- Compact mode: shorter columns
-                local levelText = string.format("|cFF00FFFF%2d|r", data.level or 0)
-                local percentText = string.format("|cFFFFFF00%4.1f|r", data.restPercent or 0)
-                local locationText = string.format("|cFF00AAFF%-10s|r", (data.location or "Unknown"):sub(1, 10))
+                local levelText = string.format("|cFF00FFFF%1d|r", data.level or 0)
+                local percentText = string.format("|cFFFFFF00%1d%%|r", data.restPercent or 0)
+                local locationText = string.format("|cFF00AAFF%-1s|r", (data.location or "Unknown"):sub(1, 30))
                 
                 -- Time since last save
                 local timeText = "|cFFFFAA00Now|r"
@@ -402,9 +402,9 @@ function RRT_UI.ShowAllCharacterData()
                     local timeDiff = time() - data.timestamp
                     if timeDiff > 0 then
                         if timeDiff < 60 then
-                            timeText = string.format("|cFFFFFF00%2ds|r", timeDiff)
+                            timeText = string.format("|cFFFFFF00%1ds|r", timeDiff)
                         elseif timeDiff < 3600 then
-                            timeText = string.format("|cFFFFFF00%2dm|r", math.floor(timeDiff / 60))
+                            timeText = string.format("|cFFFFFF00%1dm|r", math.floor(timeDiff / 60))
                         elseif timeDiff < 86400 then
                             local hours = math.floor(timeDiff / 3600)
                             local minutes = math.floor((timeDiff % 3600) / 60)
@@ -425,7 +425,7 @@ function RRT_UI.ShowAllCharacterData()
                 else
                     rate = restRates.ELSEWHERE
                 end
-                local rateText = string.format("|cFF00FF00%4.2f|r", rate)
+                local rateText = string.format("|cFF00FF00%1.2f%%|r", rate)
                 
                 -- Calculate time to full rest
                 local toFullText = "|cFF00FF00FULL|r"
@@ -450,21 +450,43 @@ function RRT_UI.ShowAllCharacterData()
                 end
                 
                 -- Status icon (single character)
-                local statusIcon = "|cFFFF0000W|r"
+                local statusIcon = "|cFFFF0000[WOrld]|r"
                 if data.isInInn == 1 then
-                    statusIcon = "|cFF00FF00I|r"
+                    statusIcon = "|cFF00FF00[Inn]|r"
                 elseif data.isInCity == 1 then
-                    statusIcon = "|cFF00FF00C|r"
+                    statusIcon = "|cFF00FF00[City]|r"
                 end
                 
-                line = string.format("%-18s | %s | %s | %s | %s | %s | %-12s | %s",
-                    charName, levelText, percentText, locationText, timeText, rateText, toFullText, statusIcon)
+                -- Add Well Rested status column
+				local wellRestedText = "|cFFAAAAAA-|r"
+					if data.hasWellRested == 1 then
+						if data.wellRestedRemaining and data.wellRestedRemaining > 0 then
+							local remaining = data.wellRestedRemaining
+							if remaining > 3600 then
+								local hours = math.floor(remaining / 3600)
+								local minutes = math.floor((remaining % 3600) / 60)
+								wellRestedText = string.format("|cFF00FFFFBuffed[%dh%02dm]|r", hours, minutes)
+							else
+								local minutes = math.ceil(remaining / 60)
+								wellRestedText = string.format("|cFF00FFFFBuffed[%dm]|r", minutes)
+							end
+						else
+							wellRestedText = "|cFF00FFFFBuffed|r"
+						end
+					end
+				
+				-- Add the icon to the end of the compact mode line
+				-- line = string.format("%-18s | %s | %s | %s | %s | %s | %-12s | %s | %s",
+					-- charName, levelText, percentText, locationText, timeText, rateText, toFullText, statusIcon, wellRestedText)
+				line = string.format("%-18s | %s | %s | %s | %s | %-12s | %s | %s",
+					charName, levelText, percentText, locationText, rateText, toFullText, statusIcon, wellRestedText)
+					
             else
                 -- Full mode: detailed columns
-                local levelText = string.format("|cFF00FFFF%2d|r", data.level or 0)
-                local restedText = string.format("|cFFFFFF00%6d|r", data.restedXP or 0)
-                local percentText = string.format("|cFF00FF00%5.1f|r", data.restPercent or 0)
-                local locationText = string.format("|cFF00AAFF%-14s|r", (data.location or "Unknown"):sub(1, 14))
+                local levelText = string.format("|cFF00FFFF%1d|r", data.level or 0)
+                local restedText = string.format("|cFFFFFF00%1d|r", data.restedXP or 0)
+                local percentText = string.format("|cFF00FF00%1d%%|r", data.restPercent or 0)
+                local locationText = string.format("|cFF00AAFF%-1s|r", (data.location or "Unknown"):sub(1, 30))
                 
                 -- Time since last save
                 local timeText = "|cFFFFAA00Now|r"
@@ -472,9 +494,9 @@ function RRT_UI.ShowAllCharacterData()
                     local timeDiff = time() - data.timestamp
                     if timeDiff > 0 then
                         if timeDiff < 60 then
-                            timeText = string.format("|cFFFFFF00%2ds|r", timeDiff)
+                            timeText = string.format("|cFFFFFF00%1ds|r", timeDiff)
                         elseif timeDiff < 3600 then
-                            timeText = string.format("|cFFFFFF00%2dm|r", math.floor(timeDiff / 60))
+                            timeText = string.format("|cFFFFFF00%1dm|r", math.floor(timeDiff / 60))
                         elseif timeDiff < 86400 then
                             local hours = math.floor(timeDiff / 3600)
                             local minutes = math.floor((timeDiff % 3600) / 60)
@@ -496,7 +518,7 @@ function RRT_UI.ShowAllCharacterData()
                 else
                     rate = restRates.ELSEWHERE
                 end
-                local rateText = string.format("|cFF00FF00%6.2f%%|r", rate)
+                local rateText = string.format("|cFF00FF00%1.2f%%|r", rate)
                 
                 -- Calculate time to full rest
                 local toFullText = "|cFF00FF00FULL|r"
@@ -528,8 +550,26 @@ function RRT_UI.ShowAllCharacterData()
                     statusIcon = "|cFF00FF00[City]|r"
                 end
                 
-                line = string.format("%-18s | %s | %s | %s | %s | %s | %s | %-14s | %s",
-                    charName, levelText, restedText, percentText, locationText, timeText, rateText, toFullText, statusIcon)
+                local wellRestedText = "|cFFAAAAAA-|r"
+					if data.hasWellRested == 1 then
+						if data.wellRestedRemaining and data.wellRestedRemaining > 0 then
+							local remaining = data.wellRestedRemaining
+							if remaining > 3600 then
+								local hours = math.floor(remaining / 3600)
+								local minutes = math.floor((remaining % 3600) / 60)
+								wellRestedText = string.format("|cFF00FFFFBuffed[%dh%02dm]|r", hours, minutes)
+							else
+								local minutes = math.ceil(remaining / 60)  -- Use ceil to round up
+								wellRestedText = string.format("|cFF00FFFFBuffed[%dm]|r", minutes)
+							end
+						else
+							wellRestedText = "|cFF00FFFFBuffed|r"
+						end
+					end
+				
+				-- Add the Well Rested column
+				 line = string.format("%-18s | %s | %s | %s | %s | %s | %s | %-14s | %s | %s",
+        charName, levelText, restedText, percentText, locationText, timeText, rateText, toFullText, statusIcon, wellRestedText)
             end
         end
         
@@ -548,7 +588,7 @@ function RRT_UI.ShowAllCharacterData()
             
             -- Check if character is at max level (using saved data)
             if data.isMaxLevel then
-                GameTooltip:AddLine("|cFF00FF00✓ MAX LEVEL|r", 0, 1, 0)
+                GameTooltip:AddLine("|cFF00FF00MAX LEVEL|r", 0, 1, 0)
                 GameTooltip:AddLine("This character has reached the server max level.", 0.8, 0.8, 0.8)
                 GameTooltip:AddLine("XP tracking is disabled for max level characters.", 0.8, 0.8, 0.8)
                 GameTooltip:AddLine("Server Max: Level " .. (data.serverMaxLevel or "Unknown"), 0.6, 0.6, 0.6)
@@ -601,6 +641,27 @@ function RRT_UI.ShowAllCharacterData()
             if data.serverMaxLevel then
                 GameTooltip:AddDoubleLine("Server Max:", "Level " .. data.serverMaxLevel, 0.8, 0.8, 0.8, 0.5, 0.5, 1)
             end
+			
+			-- Show Well Rested status in tooltip
+			if data.hasWellRested == 1 then
+				if data.wellRestedRemaining and data.wellRestedRemaining > 0 then
+					local remaining = data.wellRestedRemaining
+					if remaining > 3600 then
+						-- 1 hour or more: show hours and minutes
+						local hours = math.floor(remaining / 3600)
+						local minutes = math.floor((remaining % 3600) / 60)
+						GameTooltip:AddLine("|cFF00FFFFWell Rested Buff|r (" .. string.format("|cFF00FFFF%dh%02dm|r)", hours, minutes), 0, 1, 1)
+					else
+						-- Less than 1 hour: show only minutes
+						local minutes = math.ceil(remaining / 60)
+						GameTooltip:AddLine("|cFF00FFFFWell Rested Buff|r (" .. string.format("|cFF00FFFF%dm|r)", minutes), 0, 1, 1)
+					end
+				else
+					GameTooltip:AddLine("Duration unknown", 0.6, 0.6, 0.6)
+				end
+			else
+				GameTooltip:AddLine("|cFFAAAAAANo Well Rested Buff|r", 0.8, 0.8, 0.8)
+			end
             
             GameTooltip:Show()
         end)
@@ -619,7 +680,7 @@ function RRT_UI.ShowAllCharacterData()
         yOffset = yOffset - 15
         local legend = frame.scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         legend:SetPoint("TOPLEFT", 10, yOffset)
-        legend:SetText("|cFFAAAAAALegend:|r |cFFFFAA00Name|r=Class, |cFFFFFF00Time|r=Since Update, |cFF00FFFFTo Full:|r |cFFFF0000<1h|r |cFFFFAA001-24h|r |cFF00AAFF>1d|r |cFF00FF00FULL|r, |cFFAAAAAAMAX|r=Max Level")
+        legend:SetText("|cFFAAAAAALegend:|r |cFFFFAA00Name|r=Class, |cFFFFFF00Time|r=Since Update, |cFF00FFFFTo Full:|r |cFFFF0000<1h|r |cFFFFAA001-24h|r |cFF00AAFF>1d|r |cFF00FF00FULL|r, |cFFAAAAAAMAX|r=Max Level, |cFF00FFFFWR|r=Well Rested")
         legend:SetTextColor(0.7, 0.7, 0.7)
         yOffset = yOffset - 20
         contentHeight = contentHeight + 20
@@ -733,7 +794,7 @@ function RRT_UI.CreateMinimapIcon()
             
             -- Check if player is at max level
             if data.level == serverMaxLevel then
-                GameTooltip:AddLine("|cFF00FF00✓ MAX LEVEL|r", 0, 1, 0)
+                GameTooltip:AddLine("|cFF00FF00MAX LEVEL|r", 0, 1, 0)
                 GameTooltip:AddLine("Server Max: Level " .. serverMaxLevel, 0.6, 0.6, 0.6)
             else
                 GameTooltip:AddLine("XP: " .. data.currentXP .. "/" .. data.maxXP, 0.8, 0.8, 0.8)
@@ -753,13 +814,23 @@ function RRT_UI.CreateMinimapIcon()
                 else
                     currentRate = restRates.ELSEWHERE
                 end
+				
                 
                 if data.restPercent < 150 then
                     local secondsToFull, rate = RRT_Data.CalculateTimeToFull(data.restPercent, nil, data.location)
                     GameTooltip:AddLine("To full: " .. RRT_Utilities.FormatTimeShort(secondsToFull/3600), 1, 1, 0)
                     GameTooltip:AddLine("Rate: " .. string.format("%.2f%%/h", rate) .. " (default)", 0.8, 0.8, 0.8)
+					if data.hasWellRested == 1 then
+						GameTooltip:AddLine("|cFF00FFFFWell Rested Buff Active|r", 0, 1, 1)
+						if data.wellRestedExpires and data.wellRestedExpires > time() then
+							local remaining = data.wellRestedExpires - time()
+							GameTooltip:AddLine("Time remaining: " .. RRT_Utilities.FormatTime(remaining), 0.8, 0.8, 0.8)
+						end
+					end
+					
+					
                 else
-                    GameTooltip:AddLine("✓ Full rested!", 0, 1, 0)
+                    GameTooltip:AddLine("Full rested!", 0, 1, 0)
                 end
             end
         end

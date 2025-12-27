@@ -8,7 +8,8 @@ local CONFIG = {
     DEFAULT_REST_RATES = {
         INN_CITY = 2.5,    -- Standard rate: 2.5% per hour in inn/city (of maxXP)
         ELSEWHERE = 0.625, -- Reduced rate: 0.625% per hour elsewhere
-    }
+    },
+	WELL_RESTED_BUFF_NAME = "Well Rested",
 }
 
 local CLASS_COLORS = {
@@ -56,4 +57,8 @@ end
 
 function RRT_Config.GetFullRestPercent()
     return CONFIG.FULL_REST_PERCENT
+end
+
+function RRT_Config.GetWellRestedBuffName()
+    return CONFIG.WELL_RESTED_BUFF_NAME
 end
