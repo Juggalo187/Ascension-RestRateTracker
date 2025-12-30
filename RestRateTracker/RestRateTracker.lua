@@ -29,6 +29,9 @@ frame:RegisterEvent("PLAYER_XP_UPDATE")
 frame:RegisterEvent("ZONE_CHANGED")
 frame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 frame:RegisterEvent("PLAYER_UPDATE_RESTING")
+frame:RegisterEvent("PLAYER_CAMPING")
+
+
 
 -- Local variables
 local loginProcessed = false
@@ -126,6 +129,9 @@ frame:SetScript("OnEvent", function(self, event, ...)
         -- Update if player enters/exits rested area (silent mode)
         SafeCall(RRT_Data, "SaveCurrentCharacterData", true)
     elseif event == "PLAYER_UPDATE_RESTING" then
+        SafeCall(RRT_Data, "SaveCurrentCharacterData", true)
+	elseif event == "PLAYER_CAMPING" then
+        -- Update Logging out
         SafeCall(RRT_Data, "SaveCurrentCharacterData", true)
     end
 end)
