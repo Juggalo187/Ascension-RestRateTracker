@@ -6,7 +6,7 @@ local RRT_Config = RRT_Config or {}
 local RRT_Utilities = RRT_Utilities or {}
 local RRT_Data = RRT_Data or {}
 
--- Global sort mode (should be in main, but referenced here)
+-- Global sort mode
 RRT_SORT_MODE = RRT_SORT_MODE or "name"
 
 -- Create data display frame
@@ -130,7 +130,6 @@ function RRT_UI.CreateDataDisplayFrame()
 end
 
 -- Function to show character data in the frame
--- Function to show character data in the frame
 function RRT_UI.ShowAllCharacterData()
     local db = RRT_Data.GetDB()
     if not db then return end
@@ -176,10 +175,10 @@ function RRT_UI.ShowAllCharacterData()
     
     local headerText
     if db.settings.frameCompactMode then
-		headerText = "|cFFFFAA00Character|r | |cFF00FFFFLvl|r | |cFFFFFF00R%|r | |cFF00AAFFLoc|r | |cFF00FF00Rate|r | To Full | |cFFFFFF00S|r | |cFF00FFFFWR|r"
-	else
-		headerText = "|cFFFFAA00Character|r | |cFF00FFFFLvl|r | |cFFFFFF00RXP|r | |cFF00FF00%|r | |cFF00AAFFLocation|r | |cFFFFFF00Time|r | |cFF00FF00Rate|r | To Full | |cFFFFFF00Status|r | |cFF00FFFFWR|r"
-	end
+        headerText = "|cFFFFAA00Character|r | |cFF00FFFFLvl|r | |cFFFFFF00R%|r | |cFF00AAFFLoc|r | |cFF00FF00Rate|r | To Full | |cFFFFFF00S|r | |cFF00FFFFWR|r"
+    else
+        headerText = "|cFFFFAA00Character|r | |cFF00FFFFLvl|r | |cFFFFFF00RXP|r | |cFF00FF00%|r | |cFF00AAFFLocation|r | |cFFFFFF00Time|r | |cFF00FF00Rate|r | To Full | |cFFFFFF00Status|r | |cFF00FFFFWR|r"
+    end
     
     local headers = headerButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     headers:SetAllPoints()
@@ -326,18 +325,18 @@ function RRT_UI.ShowAllCharacterData()
         local charName, realm = RRT_Utilities.SplitCharacterKey(char.key)
         charName = string.match(charName, "^([^-]+)") or charName
         
-        -- Calculate estimated current values based on elapsed time
         local estimatedRestPercent = data.restPercent or 0
         local estimatedRestedXP = data.restedXP or 0
         local elapsedHours = 0
+        -- FIXED: Well Rested buff PAUSES while offline on this private server
         local estimatedWellRestedRemaining = data.wellRestedRemaining or 0
         
-        if data.timestamp and not data.isMaxLevel then
+        if data.timestamp then
             local timeDiff = time() - data.timestamp
             elapsedHours = timeDiff / 3600
             
-            -- Only update if we have valid data
-            if data.maxXP and data.maxXP > 0 then
+            -- Only update rest XP if not max level
+            if not data.isMaxLevel and data.maxXP and data.maxXP > 0 then
                 local rate = 0
                 if data.isInInn == 1 or data.isInCity == 1 then
                     rate = restRates.INN_CITY
@@ -355,10 +354,8 @@ function RRT_UI.ShowAllCharacterData()
                 estimatedRestedXP = math.floor((estimatedRestPercent / 100) * data.maxXP)
             end
             
-            -- Also estimate Well Rested buff remaining
-            if estimatedWellRestedRemaining > 0 and elapsedHours > 0 then
-                estimatedWellRestedRemaining = math.max(0, estimatedWellRestedRemaining - (elapsedHours * 3600))
-            end
+            -- FIXED: Well Rested buff PAUSES while offline - DO NOT subtract elapsed time
+            -- estimatedWellRestedRemaining remains as saved value
         end
         
         -- ALWAYS group by realm (even in compact mode)
@@ -466,7 +463,7 @@ function RRT_UI.ShowAllCharacterData()
                 end
                 local rateText = string.format("|cFF00FF00%1.2f%%|r", rate)
                 
-                -- Calculate time to full rest - UPDATED: accounts for elapsed time since logout
+                -- Calculate time to full rest
                 local toFullText = "|cFF00FF00FULL|r"
                 if estimatedRestPercent < 150 then
                     local hoursToFull = (150 - estimatedRestPercent) / rate
@@ -496,28 +493,28 @@ function RRT_UI.ShowAllCharacterData()
                     statusIcon = "|cFF00FF00[City]|r"
                 end
                 
-                -- Add Well Rested status column
-				local wellRestedText = "|cFFAAAAAA-|r"
-				if data.hasWellRested == 1 then
-					if estimatedWellRestedRemaining > 0 then
-						local remaining = estimatedWellRestedRemaining
-						if remaining > 3600 then
-							local hours = math.floor(remaining / 3600)
-							local minutes = math.floor((remaining % 3600) / 60)
-							wellRestedText = string.format("|cFF00FFFFBuffed[%dh%02dm]|r", hours, minutes)
-						else
-							local minutes = math.ceil(remaining / 60)
-							wellRestedText = string.format("|cFF00FFFFBuffed[%dm]|r", minutes)
-						end
-					else
-						wellRestedText = "|cFF00FFFFBuffed|r"
-					end
-				end
-				
-				-- Add the icon to the end of the compact mode line
-				line = string.format("%-18s | %s | %s | %s | %s | %-12s | %s | %s",
-					charName, levelText, percentText, locationText, rateText, toFullText, statusIcon, wellRestedText)
-					
+                -- Add Well Rested status column - FIXED: Buff pauses while offline
+                local wellRestedText = "|cFFAAAAAA-|r"
+                if data.hasWellRested == 1 then
+                    local remaining = data.wellRestedRemaining or 0
+                    if remaining > 0 then
+                        if remaining > 3600 then
+                            local hours = math.floor(remaining / 3600)
+                            local minutes = math.floor((remaining % 3600) / 60)
+                            wellRestedText = string.format("|cFF00FFFFWR[%dh%02d]|r", hours, minutes)
+                        else
+                            local minutes = math.ceil(remaining / 60)
+                            wellRestedText = string.format("|cFF00FFFFWR[%dm]|r", minutes)
+                        end
+                    else
+                        wellRestedText = "|cFF00FFFFWR|r"
+                    end
+                end
+                
+                -- Add the icon to the end of the compact mode line
+                line = string.format("%-18s | %s | %s | %s | %s | %-12s | %s | %s",
+                    charName, levelText, percentText, locationText, rateText, toFullText, statusIcon, wellRestedText)
+                    
             else
                 -- Full mode: detailed columns
                 local levelText = string.format("|cFF00FFFF%1d|r", data.level or 0)
@@ -556,7 +553,7 @@ function RRT_UI.ShowAllCharacterData()
                 end
                 local rateText = string.format("|cFF00FF00%1.2f%%|r", rate)
                 
-                -- Calculate time to full rest - UPDATED: accounts for elapsed time since logout
+                -- Calculate time to full rest
                 local toFullText = "|cFF00FF00FULL|r"
                 if estimatedRestPercent < 150 then
                     local hoursToFull = (150 - estimatedRestPercent) / rate
@@ -586,26 +583,27 @@ function RRT_UI.ShowAllCharacterData()
                     statusIcon = "|cFF00FF00[City]|r"
                 end
                 
+                -- Add Well Rested column - FIXED: Buff pauses while offline
                 local wellRestedText = "|cFFAAAAAA-|r"
-				if data.hasWellRested == 1 then
-					if estimatedWellRestedRemaining > 0 then
-						local remaining = estimatedWellRestedRemaining
-						if remaining > 3600 then
-							local hours = math.floor(remaining / 3600)
-							local minutes = math.floor((remaining % 3600) / 60)
-							wellRestedText = string.format("|cFF00FFFFBuffed[%dh%02dm]|r", hours, minutes)
-						else
-							local minutes = math.ceil(remaining / 60)
-							wellRestedText = string.format("|cFF00FFFFBuffed[%dm]|r", minutes)
-						end
-					else
-						wellRestedText = "|cFF00FFFFBuffed|r"
-					end
-				end
-				
-				-- Add the Well Rested column
-				 line = string.format("%-18s | %s | %s | %s | %s | %s | %s | %-14s | %s | %s",
-        charName, levelText, restedText, percentText, locationText, timeText, rateText, toFullText, statusIcon, wellRestedText)
+                if data.hasWellRested == 1 then
+                    local remaining = data.wellRestedRemaining or 0
+                    if remaining > 0 then
+                        if remaining > 3600 then
+                            local hours = math.floor(remaining / 3600)
+                            local minutes = math.floor((remaining % 3600) / 60)
+                            wellRestedText = string.format("|cFF00FFFFWR[%dh%02d]|r", hours, minutes)
+                        else
+                            local minutes = math.ceil(remaining / 60)
+                            wellRestedText = string.format("|cFF00FFFFWR[%dm]|r", minutes)
+                        end
+                    else
+                        wellRestedText = "|cFF00FFFFWR|r"
+                    end
+                end
+                
+                -- Add the Well Rested column
+                line = string.format("%-18s | %s | %s | %s | %s | %s | %s | %-14s | %s | %s",
+                    charName, levelText, restedText, percentText, locationText, timeText, rateText, toFullText, statusIcon, wellRestedText)
             end
         end
         
@@ -683,26 +681,33 @@ function RRT_UI.ShowAllCharacterData()
             if data.serverMaxLevel then
                 GameTooltip:AddDoubleLine("Server Max:", "Level " .. data.serverMaxLevel, 0.8, 0.8, 0.8, 0.5, 0.5, 1)
             end
-			
-			-- Show Well Rested status in tooltip
-			if data.hasWellRested == 1 then
-                if estimatedWellRestedRemaining > 0 then
-                    if estimatedWellRestedRemaining > 3600 then
+            
+            -- Show Well Rested status in tooltip - FIXED: Buff pauses while offline
+            if data.hasWellRested == 1 then
+                local remaining = data.wellRestedRemaining or 0
+                -- FIXED: Buff PAUSES while offline on this private server
+                
+                if remaining > 0 then
+                    if remaining > 3600 then
                         -- 1 hour or more: show hours and minutes
-                        local hours = math.floor(estimatedWellRestedRemaining / 3600)
-                        local minutes = math.floor((estimatedWellRestedRemaining % 3600) / 60)
-                        GameTooltip:AddLine("|cFF00FFFFWell Rested Buff|r (" .. string.format("|cFF00FFFF%dh%02dm|r remaining)", hours, minutes), 0, 1, 1)
+                        local hours = math.floor(remaining / 3600)
+                        local minutes = math.floor((remaining % 3600) / 60)
+                        GameTooltip:AddLine("|cFF00FFFFWell Rested Buff|r (" .. 
+                            string.format("|cFF00FFFF%dh%02dm|r remaining, |cFFAAAAAApauses while offline|r)", hours, minutes), 
+                            0, 1, 1)
                     else
                         -- Less than 1 hour: show only minutes
-                        local minutes = math.ceil(estimatedWellRestedRemaining / 60)
-                        GameTooltip:AddLine("|cFF00FFFFWell Rested Buff|r (" .. string.format("|cFF00FFFF%dm|r remaining)", minutes), 0, 1, 1)
+                        local minutes = math.ceil(remaining / 60)
+                        GameTooltip:AddLine("|cFF00FFFFWell Rested Buff|r (" .. 
+                            string.format("|cFF00FFFF%dm|r remaining, |cFFAAAAAApauses while offline|r)", minutes), 
+                            0, 1, 1)
                     end
                 else
-                    GameTooltip:AddLine("|cFF00FFFFWell Rested Buff|r (Duration unknown or expired)", 0.6, 0.6, 0.6)
+                    GameTooltip:AddLine("|cFF00FFFFWell Rested Buff|r (Duration unknown, |cFFAAAAAApauses while offline|r)", 0.6, 0.6, 0.6)
                 end
-			else
-				GameTooltip:AddLine("|cFFAAAAAANo Well Rested Buff|r", 0.8, 0.8, 0.8)
-			end
+            else
+                GameTooltip:AddLine("|cFFAAAAAANo Well Rested Buff|r", 0.8, 0.8, 0.8)
+            end
             
             GameTooltip:Show()
         end)
@@ -819,192 +824,79 @@ function RRT_UI.CreateMinimapIcon()
     
     -- Tooltip
     icon:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-        GameTooltip:AddLine("Rest Rate Tracker", 1, 1, 1)
-        GameTooltip:AddLine("Left-click: View all characters", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine("Right-click: Current status", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine("/rrt help for more commands", 0.6, 0.6, 0.6)
-        
-        local data = RRT_Data.GetCurrentRestData()
-        if data then
-            local _, class = UnitClass("player")
-            local serverMaxLevel = RRT_Utilities.GetServerMaxLevel()
-            
-            GameTooltip:AddLine(" ", 1, 1, 1)
-            GameTooltip:AddLine("Level " .. data.level .. " " .. (class or ""), 0.8, 0.8, 0.8)
-            
-            -- Check if player is at max level
-            if data.level == serverMaxLevel then
-                GameTooltip:AddLine("|cFF00FF00MAX LEVEL|r", 0, 1, 0)
-                GameTooltip:AddLine("Server Max: Level " .. serverMaxLevel, 0.6, 0.6, 0.6)
-            else
-                GameTooltip:AddLine("XP: " .. data.currentXP .. "/" .. data.maxXP, 0.8, 0.8, 0.8)
-                GameTooltip:AddLine("Rested: " .. string.format("%.1f%%", data.restPercent), 0, 1, 0)
-                
-                -- Get default rate for current location
-                local currentRate = 0
-                local restRates = RRT_Config.GetRestRates() or {INN_CITY = 2.5, ELSEWHERE = 0.625}
-                if IsResting() then
-                    currentRate = restRates.INN_CITY
-                elseif data.location and (data.location == "Stormwind" or data.location == "Orgrimmar" or 
-                       string.find(data.location, "City") or string.find(data.location, "Sanctuary") or
-                       data.location == "Ironforge" or data.location == "Darnassus" or 
-                       data.location == "Undercity" or data.location == "Thunder Bluff" or
-                       data.location == "Shattrath City" or data.location == "Dalaran") then
-                    currentRate = restRates.INN_CITY
-                else
-                    currentRate = restRates.ELSEWHERE
-                end
-                
-                if data.restPercent < 150 then
-                    local secondsToFull, rate = RRT_Data.CalculateTimeToFull(data.restPercent, nil, data.location)
-                    GameTooltip:AddLine("To full: " .. RRT_Utilities.FormatTimeShort(secondsToFull/3600), 1, 1, 0)
-                    GameTooltip:AddLine("Rate: " .. string.format("%.2f%%/h", rate) .. " (default)", 0.8, 0.8, 0.8)
+    GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+    GameTooltip:AddLine("Rest Rate Tracker", 1, 1, 1)
+    GameTooltip:AddLine("Left-click: View all characters", 0.8, 0.8, 0.8)
+    GameTooltip:AddLine("Right-click: Current status", 0.8, 0.8, 0.8)
+    GameTooltip:AddLine("/rrt help for more commands", 0.6, 0.6, 0.6)
+    
+    local data = RRT_Data.GetCurrentRestData()
+    if data then
+			local _, class = UnitClass("player")
+			local serverMaxLevel = RRT_Utilities.GetServerMaxLevel()
+			
+			GameTooltip:AddLine(" ", 1, 1, 1)
+			GameTooltip:AddLine("Level " .. data.level .. " " .. (class or ""), 0.8, 0.8, 0.8)
+			
+			-- Check if player is at max level
+			if data.level == serverMaxLevel then
+				GameTooltip:AddLine("|cFF00FF00MAX LEVEL|r", 0, 1, 0)
+				GameTooltip:AddLine("Server Max: Level " .. serverMaxLevel, 0.6, 0.6, 0.6)
+			else
+				GameTooltip:AddLine("XP: " .. data.currentXP .. "/" .. data.maxXP, 0.8, 0.8, 0.8)
+				GameTooltip:AddLine("Rested: " .. string.format("%.1f%%", data.restPercent), 0, 1, 0)
+				
+				-- Get default rate for current location
+				local currentRate = 0
+				local restRates = RRT_Config.GetRestRates() or {INN_CITY = 2.5, ELSEWHERE = 0.625}
+				if IsResting() then
+					currentRate = restRates.INN_CITY
+				elseif data.location and (data.location == "Stormwind" or data.location == "Orgrimmar" or 
+					string.find(data.location, "City") or string.find(data.location, "Sanctuary") or
+					data.location == "Ironforge" or data.location == "Darnassus" or 
+					data.location == "Undercity" or data.location == "Thunder Bluff" or
+					data.location == "Shattrath City" or data.location == "Dalaran") then
+					currentRate = restRates.INN_CITY
+				else
+					currentRate = restRates.ELSEWHERE
+				end
+				
+				if data.restPercent < 150 then
+					local secondsToFull, rate = RRT_Data.CalculateTimeToFull(data.restPercent, nil, data.location)
+					GameTooltip:AddLine("To full: " .. RRT_Utilities.FormatTimeShort(secondsToFull/3600), 1, 1, 0)
+					GameTooltip:AddLine("Rate: " .. string.format("%.2f%%/h", rate) .. " (default)", 0.8, 0.8, 0.8)
+					
+					-- Show Well Rested buff info - FIXED: Buff pauses while offline
 					if data.hasWellRested == 1 then
+						local remaining = data.wellRestedRemaining or 0
+						-- FIXED: Buff PAUSES while offline - don't subtract elapsed time
+						
 						GameTooltip:AddLine("|cFF00FFFFWell Rested Buff Active|r", 0, 1, 1)
-						if data.wellRestedExpires and data.wellRestedExpires > time() then
-							local remaining = data.wellRestedExpires - time()
-							GameTooltip:AddLine("Time remaining: " .. RRT_Utilities.FormatTime(remaining), 0.8, 0.8, 0.8)
+						if remaining > 0 then
+							if remaining > 3600 then
+								local hours = math.floor(remaining / 3600)
+								local minutes = math.floor((remaining % 3600) / 60)
+								GameTooltip:AddLine("Time remaining: " .. 
+									string.format("%dh%02dm (|cFFAAAAAApauses while offline|r)", hours, minutes), 
+									0.8, 0.8, 0.8)
+							else
+								local minutes = math.ceil(remaining / 60)
+								GameTooltip:AddLine("Time remaining: " .. 
+									string.format("%dm (|cFFAAAAAApauses while offline|r)", minutes), 
+									0.8, 0.8, 0.8)
+							end
+						else
+							GameTooltip:AddLine("Time remaining: Unknown (|cFFAAAAAApauses while offline|r)", 0.8, 0.8, 0.8)
 						end
 					end
-                else
-                    GameTooltip:AddLine("Full rested!", 0, 1, 0)
-                end
-            end
-        end
-        
-        GameTooltip:Show()
-    end)
-    
-    icon:SetScript("OnLeave", function(self)
-        GameTooltip:Hide()
-    end)
-    
-    -- Make it draggable
-    icon:SetScript("OnMouseDown", function(self, button)
-        if button == "MiddleButton" then
-            self.isMoving = true
-            self:StartMoving()
-        end
-    end)
-    
-    icon:SetScript("OnMouseUp", function(self, button)
-        if button == "MiddleButton" and self.isMoving then
-            self.isMoving = false
-            self:StopMovingOrSizing()
-        end
-    end)
-    
-    return icon
-end
-
--- Mini-map icon with simple round appearance for Classic WoW
-function RRT_UI.CreateMinimapIcon()
-    local icon = CreateFrame("Button", "RRTMinimapButton", Minimap)
-    icon:SetFrameStrata("HIGH")
-    icon:SetWidth(31)
-    icon:SetHeight(31)
-    icon:SetMovable(true)
-    icon:SetPoint("CENTER", Minimap, "TOPLEFT", 12, -80)
-    
-    -- Create background for round appearance
-    icon.bg = icon:CreateTexture(nil, "BACKGROUND")
-    icon.bg:SetAllPoints(icon)
-    icon.bg:SetTexture("Interface\\Minimap\\UI-Minimap-Background")
-    icon.bg:SetTexCoord(0, 1, 0, 1)
-    
-    -- Create the icon texture
-    icon.texture = icon:CreateTexture(nil, "OVERLAY")
-    icon.texture:SetWidth(20)
-    icon.texture:SetHeight(20)
-    icon.texture:SetPoint("CENTER", icon, "CENTER")
-    
-    -- Try to use the addon icon
-    icon.texture:SetTexture("Interface\\AddOns\\RestRateTracker\\icon.tga")
-    
-    -- If custom icon doesn't exist, use a default book icon
-    if not icon.texture:GetTexture() then
-        icon.texture:SetTexture("Interface\\Icons\\Inv_misc_book_09")
-    end
-    
-    -- Create circular border using the tracking border texture
-    icon.border = icon:CreateTexture(nil, "BORDER")
-    icon.border:SetAllPoints(icon)
-    icon.border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
-    
-    -- Highlight texture
-    icon.highlight = icon:CreateTexture(nil, "HIGHLIGHT")
-    icon.highlight:SetAllPoints(icon)
-    icon.highlight:SetTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
-    icon.highlight:SetBlendMode("ADD")
-    
-    -- Click handler - LEFT click opens the character data frame
-    icon:SetScript("OnClick", function(self, button)
-        if button == "LeftButton" then
-            RRT_UI.ShowAllCharacterData()
-        elseif button == "RightButton" then
-            SlashCmdList["RESTRATE"]("current")
-        end
-    end)
-    
-    -- Tooltip
-    icon:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-        GameTooltip:AddLine("Rest Rate Tracker", 1, 1, 1)
-        GameTooltip:AddLine("Left-click: View all characters", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine("Right-click: Current status", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine("/rrt help for more commands", 0.6, 0.6, 0.6)
-        
-        local data = RRT_Data.GetCurrentRestData()
-        if data then
-            local _, class = UnitClass("player")
-            local serverMaxLevel = RRT_Utilities.GetServerMaxLevel()
-            
-            GameTooltip:AddLine(" ", 1, 1, 1)
-            GameTooltip:AddLine("Level " .. data.level .. " " .. (class or ""), 0.8, 0.8, 0.8)
-            
-            -- Check if player is at max level
-            if data.level == serverMaxLevel then
-                GameTooltip:AddLine("|cFF00FF00MAX LEVEL|r", 0, 1, 0)
-                GameTooltip:AddLine("Server Max: Level " .. serverMaxLevel, 0.6, 0.6, 0.6)
-            else
-                GameTooltip:AddLine("XP: " .. data.currentXP .. "/" .. data.maxXP, 0.8, 0.8, 0.8)
-                GameTooltip:AddLine("Rested: " .. string.format("%.1f%%", data.restPercent), 0, 1, 0)
-                
-                -- Get default rate for current location
-                local currentRate = 0
-                local restRates = RRT_Config.GetRestRates()
-                if IsResting() then
-                    currentRate = restRates.INN_CITY
-                elseif data.location and (data.location == "Stormwind" or data.location == "Orgrimmar" or 
-                       string.find(data.location, "City") or string.find(data.location, "Sanctuary") or
-                       data.location == "Ironforge" or data.location == "Darnassus" or 
-                       data.location == "Undercity" or data.location == "Thunder Bluff" or
-                       data.location == "Shattrath City" or data.location == "Dalaran") then
-                    currentRate = restRates.INN_CITY
-                else
-                    currentRate = restRates.ELSEWHERE
-                end
-                
-                if data.restPercent < 150 then
-                    local secondsToFull, rate = RRT_Data.CalculateTimeToFull(data.restPercent, nil, data.location)
-                    GameTooltip:AddLine("To full: " .. RRT_Utilities.FormatTimeShort(secondsToFull/3600), 1, 1, 0)
-                    GameTooltip:AddLine("Rate: " .. string.format("%.2f%%/h", rate) .. " (default)", 0.8, 0.8, 0.8)
-					if data.hasWellRested == 1 then
-						GameTooltip:AddLine("|cFF00FFFFWell Rested Buff Active|r", 0, 1, 1)
-						if data.wellRestedExpires and data.wellRestedExpires > time() then
-							local remaining = data.wellRestedExpires - time()
-							GameTooltip:AddLine("Time remaining: " .. RRT_Utilities.FormatTime(remaining), 0.8, 0.8, 0.8)
-						end
-					end
-                else
-                    GameTooltip:AddLine("Full rested!", 0, 1, 0)
-                end
-            end
-        end
-        
-        GameTooltip:Show()
-    end)
+				else
+					GameTooltip:AddLine("Full rested!", 0, 1, 0)
+				end
+			end
+		end
+		
+		GameTooltip:Show()
+	end)
     
     icon:SetScript("OnLeave", function(self)
         GameTooltip:Hide()
